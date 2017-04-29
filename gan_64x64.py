@@ -65,7 +65,7 @@ def GeneratorAndDiscriminator():
 
     raise Exception('You must choose an architecture!')
 
-DEVICES = ['/gpu:{}'.format(i) for i in xrange(N_GPUS)]
+DEVICES = ['/gpu:{}'.format(i) for i in range(N_GPUS)]
 
 def LeakyReLU(x, alpha=0.2):
     return tf.maximum(alpha*x, x)
@@ -220,19 +220,19 @@ def ResnetGenerator(n_samples, noise=None, dim=DIM):
     output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*8*dim, noise)
     output = tf.reshape(output, [-1, 8*dim, 4, 4])
 
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Generator.4x4_{}'.format(i), 8*dim, 8*dim, 3, output, resample=None)
     output = ResidualBlock('Generator.Up1', 8*dim, 4*dim, 3, output, resample='up')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Generator.8x8_{}'.format(i), 4*dim, 4*dim, 3, output, resample=None)
     output = ResidualBlock('Generator.Up2', 4*dim, 2*dim, 3, output, resample='up')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Generator.16x16_{}'.format(i), 2*dim, 2*dim, 3, output, resample=None)
     output = ResidualBlock('Generator.Up3', 2*dim, 1*dim, 3, output, resample='up')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Generator.32x32_{}'.format(i), 1*dim, 1*dim, 3, output, resample=None)
     output = ResidualBlock('Generator.Up4', 1*dim, dim/2, 3, output, resample='up')
-    for i in xrange(5):
+    for i in range(5):
         output = ResidualBlock('Generator.64x64_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
 
     output = lib.ops.conv2d.Conv2D('Generator.Out', dim/2, 3, 1, output, he_init=False)
@@ -304,19 +304,19 @@ def ResnetDiscriminator(inputs, dim=DIM):
     output = tf.reshape(inputs, [-1, 3, 64, 64])
     output = lib.ops.conv2d.Conv2D('Discriminator.In', 3, dim/2, 1, output, he_init=False)
 
-    for i in xrange(5):
+    for i in range(5):
         output = ResidualBlock('Discriminator.64x64_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
     output = ResidualBlock('Discriminator.Down1', dim/2, dim*1, 3, output, resample='down')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Discriminator.32x32_{}'.format(i), dim*1, dim*1, 3, output, resample=None)
     output = ResidualBlock('Discriminator.Down2', dim*1, dim*2, 3, output, resample='down')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Discriminator.16x16_{}'.format(i), dim*2, dim*2, 3, output, resample=None)
     output = ResidualBlock('Discriminator.Down3', dim*2, dim*4, 3, output, resample='down')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Discriminator.8x8_{}'.format(i), dim*4, dim*4, 3, output, resample=None)
     output = ResidualBlock('Discriminator.Down4', dim*4, dim*8, 3, output, resample='down')
-    for i in xrange(6):
+    for i in range(6):
         output = ResidualBlock('Discriminator.4x4_{}'.format(i), dim*8, dim*8, 3, output, resample=None)
 
     output = tf.reshape(output, [-1, 4*4*8*dim])
@@ -327,7 +327,7 @@ def ResnetDiscriminator(inputs, dim=DIM):
 
 def FCDiscriminator(inputs, FC_DIM=512, n_layers=3):
     output = LeakyReLULayer('Discriminator.Input', OUTPUT_DIM, FC_DIM, inputs)
-    for i in xrange(n_layers):
+    for i in range(n_layers):
         output = LeakyReLULayer('Discriminator.{}'.format(i), FC_DIM, FC_DIM, output)
     output = lib.ops.linear.Linear('Discriminator.Out', FC_DIM, 1, output)
 
@@ -492,7 +492,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
                 yield images
 
     # Save a batch of ground-truth samples
-    _x = inf_train_gen().next()
+    _x = next(inf_train_gen())
     _x_r = session.run(real_data, feed_dict={real_data_conv: _x})
     _x_r = ((_x_r+1.)*(255.99/2)).astype('int32')
     lib.save_images.save_images(_x_r.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_groundtruth.png')
@@ -501,7 +501,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     # Train loop
     session.run(tf.initialize_all_variables())
     gen = inf_train_gen()
-    for iteration in xrange(ITERS):
+    for iteration in range(ITERS):
 
         start_time = time.time()
 
@@ -514,8 +514,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             disc_iters = 1
         else:
             disc_iters = CRITIC_ITERS
-        for i in xrange(disc_iters):
-            _data = gen.next()
+        for i in range(disc_iters):
+            _data = next(gen)
             _disc_cost, _ = session.run([disc_cost, disc_train_op], feed_dict={all_real_data_conv: _data})
             if MODE == 'wgan':
                 _ = session.run([clip_disc_weights])

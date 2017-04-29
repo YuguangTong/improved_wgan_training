@@ -1,9 +1,9 @@
 import numpy as np
 
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import gzip
-import cPickle as pickle
+import pickle as pickle
 
 def unpickle(file):
     fo = open(file, 'rb')
@@ -21,7 +21,7 @@ def cifar_generator(filenames, batch_size, data_dir):
     def get_epoch():
         np.random.shuffle(images)
 
-        for i in xrange(len(images) / batch_size):
+        for i in range(len(images) / batch_size):
             yield np.copy(images[i*batch_size:(i+1)*batch_size])
 
     return get_epoch

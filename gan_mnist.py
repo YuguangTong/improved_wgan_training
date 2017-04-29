@@ -207,11 +207,11 @@ def inf_train_gen():
 # Train loop
 with tf.Session() as session:
 
-    session.run(tf.initialize_all_variables())
+    session.run(tf.global_variables_initializer())
 
     gen = inf_train_gen()
 
-    for iteration in xrange(ITERS):
+    for iteration in range(ITERS):
         start_time = time.time()
 
         if iteration > 0:
@@ -221,8 +221,8 @@ with tf.Session() as session:
             disc_iters = 1
         else:
             disc_iters = CRITIC_ITERS
-        for i in xrange(disc_iters):
-            _data = gen.next()
+        for i in range(disc_iters):
+            _data = next(gen)
             _disc_cost, _ = session.run(
                 [disc_cost, disc_train_op],
                 feed_dict={real_data: _data}

@@ -131,12 +131,12 @@ else:
         )
     clip_disc_weights = tf.group(*clip_ops)
 
-print "Generator params:"
+print("Generator params:")
 for var in lib.params_with_name('Generator'):
-    print "\t{}\t{}".format(var.name, var.get_shape())
-print "Discriminator params:"
+    print("\t{}\t{}".format(var.name, var.get_shape()))
+print("Discriminator params:")
 for var in lib.params_with_name('Discriminator'):
-    print "\t{}\t{}".format(var.name, var.get_shape())
+    print("\t{}\t{}".format(var.name, var.get_shape()))
 
 frame_index = [0]
 def generate_image(true_dist):
@@ -173,9 +173,9 @@ def inf_train_gen():
     if DATASET == '25gaussians':
     
         dataset = []
-        for i in xrange(100000/25):
-            for x in xrange(-2, 3):
-                for y in xrange(-2, 3):
+        for i in range(100000/25):
+            for x in range(-2, 3):
+                for y in range(-2, 3):
                     point = np.random.randn(2)*0.05
                     point[0] += 2*x
                     point[1] += 2*y
@@ -184,7 +184,7 @@ def inf_train_gen():
         np.random.shuffle(dataset)
         dataset /= 2.828 # stdev
         while True:
-            for i in xrange(len(dataset)/BATCH_SIZE):
+            for i in range(len(dataset)/BATCH_SIZE):
                 yield dataset[i*BATCH_SIZE:(i+1)*BATCH_SIZE]
 
     elif DATASET == 'swissroll':
@@ -214,7 +214,7 @@ def inf_train_gen():
         centers = [(scale*x,scale*y) for x,y in centers]
         while True:
             dataset = []
-            for i in xrange(BATCH_SIZE):
+            for i in range(BATCH_SIZE):
                 point = np.random.randn(2)*.02
                 center = random.choice(centers)
                 point[0] += center[0]
@@ -228,13 +228,13 @@ def inf_train_gen():
 with tf.Session() as session:
     session.run(tf.initialize_all_variables())
     gen = inf_train_gen()
-    for iteration in xrange(ITERS):
+    for iteration in range(ITERS):
         # Train generator
         if iteration > 0:
             _ = session.run(gen_train_op)
         # Train critic
-        for i in xrange(CRITIC_ITERS):
-            _data = gen.next()
+        for i in range(CRITIC_ITERS):
+            _data = next(gen)
             _disc_cost, _ = session.run(
                 [disc_cost, disc_train_op],
                 feed_dict={real_data: _data}

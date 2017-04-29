@@ -31,8 +31,8 @@ def Conv1D(name, input_dim, output_dim, filter_size, inputs, he_init=True, mask_
             mask[center+1:, :, :] = 0.
 
             # Mask out future channels
-            for i in xrange(mask_n_channels):
-                for j in xrange(mask_n_channels):
+            for i in range(mask_n_channels):
+                for j in range(mask_n_channels):
                     if (mask_type=='a' and i >= j) or (mask_type=='b' and i > j):
                         mask[
                             center,
