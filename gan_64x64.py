@@ -20,7 +20,7 @@ import tflib.plot
 
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
-DATA_DIR = ''
+DATA_DIR = 'data/imagenet'
 if len(DATA_DIR) == 0:
     raise Exception('Please specify path to data directory in gan_64x64.py!')
 
@@ -29,7 +29,7 @@ DIM = 64 # Model dimensionality
 CRITIC_ITERS = 5 # How many iterations to train the critic for
 N_GPUS = 1 # Number of GPUs
 BATCH_SIZE = 64 # Batch size. Must be a multiple of N_GPUS
-ITERS = 200000 # How many iterations to train for
+ITERS = 2000 # How many iterations to train for
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
 OUTPUT_DIM = 64*64*3 # Number of pixels in each iamge
 
@@ -381,8 +381,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     for device_index, (device, real_data_conv) in enumerate(zip(DEVICES, split_real_data_conv)):
         with tf.device(device):
 
-            real_data = tf.reshape(2*((tf.cast(real_data_conv, tf.float32)/255.)-.5), [BATCH_SIZE/len(DEVICES), OUTPUT_DIM])
-            fake_data = Generator(BATCH_SIZE/len(DEVICES))
+            real_data = tf.reshape(2*((tf.cast(real_data_conv, tf.float32)/255.)-.5), [BATCH_SIZE//len(DEVICES), OUTPUT_DIM])
+            fake_data = Generator(BATCH_SIZE//len(DEVICES))
 
             disc_real = Discriminator(real_data)
             disc_fake = Discriminator(fake_data)
@@ -396,7 +396,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
                 disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
 
                 alpha = tf.random_uniform(
-                    shape=[BATCH_SIZE/len(DEVICES),1], 
+                    shape=[BATCH_SIZE//len(DEVICES),1], 
                     minval=0.,
                     maxval=1.
                 )
@@ -471,7 +471,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     fixed_noise = tf.constant(np.random.normal(size=(BATCH_SIZE, 128)).astype('float32'))
     all_fixed_noise_samples = []
     for device_index, device in enumerate(DEVICES):
-        n_samples = BATCH_SIZE / len(DEVICES)
+        n_samples = BATCH_SIZE // len(DEVICES)
         all_fixed_noise_samples.append(Generator(n_samples, noise=fixed_noise[device_index*n_samples:(device_index+1)*n_samples]))
     if tf.__version__.startswith('1.'):
         all_fixed_noise_samples = tf.concat(all_fixed_noise_samples, axis=0)
@@ -499,7 +499,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
 
     # Train loop
-    session.run(tf.initialize_all_variables())
+    session.run(tf.global_variables_initializer())
     gen = inf_train_gen()
     for iteration in range(ITERS):
 
