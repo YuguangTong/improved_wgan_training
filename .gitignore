@@ -7,3 +7,5 @@ summary/
 *.pkl
 *.jpg
 *.png
+*.log
+*~

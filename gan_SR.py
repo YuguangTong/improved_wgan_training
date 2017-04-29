@@ -22,18 +22,19 @@ import tflib.plot
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
 DATA_DIR = 'data/celebA_64x64'
-#DATA_DIR = 'data/imagenet'
 SUMMARY_DIR = 'summary/celebA'
 if len(DATA_DIR) == 0:
     raise Exception('Please specify path to data directory in gan_64x64.py!')
 
 MODE = 'wgan-gp' # dcgan, wgan, wgan-gp, lsgan
 DIM = 64 # Model dimensionality
+K = 4 # How much to downsample
 CRITIC_ITERS = 5 # How many iterations to train the critic for
 N_GPUS = 1 # Number of GPUs
 BATCH_SIZE = 16 # Batch size. Must be a multiple of N_GPUS
 ITERS = 5000 # How many iterations to train for
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
+INPUT_DIM = 16*16*3 # Number of pixels in each input
 OUTPUT_DIM = 64*64*3 # Number of pixels in each iamge
 
 lib.print_model_settings(locals().copy())
@@ -141,11 +142,11 @@ def ResidualBlock(name, input_dim, output_dim, filter_size, inputs, resample=Non
 
 # ! Generators
 
-def FCGenerator(n_samples, noise=None, FC_DIM=512):
+def FCGenerator(n_samples, noise=None, FC_DIM=512, input_dim=INPUT_DIM):
     if noise is None:
-        noise = tf.random_normal([n_samples, 128])
+        noise = tf.random_normal([n_samples, input_dim])
 
-    output = ReLULayer('Generator.1', 128, FC_DIM, noise)
+    output = ReLULayer('Generator.1', input_dim, FC_DIM, noise)
     output = ReLULayer('Generator.2', FC_DIM, FC_DIM, output)
     output = ReLULayer('Generator.3', FC_DIM, FC_DIM, output)
     output = ReLULayer('Generator.4', FC_DIM, FC_DIM, output)
@@ -155,15 +156,17 @@ def FCGenerator(n_samples, noise=None, FC_DIM=512):
 
     return output
 
-def DCGANGenerator(n_samples, noise=None, dim=DIM, bn=True, nonlinearity=tf.nn.relu):
+def DCGANGenerator(
+        n_samples, noise=None, dim=DIM, input_dim=INPUT_DIM,
+        bn=True, nonlinearity=tf.nn.relu):
     lib.ops.conv2d.set_weights_stdev(0.02)
     lib.ops.deconv2d.set_weights_stdev(0.02)
     lib.ops.linear.set_weights_stdev(0.02)
 
     if noise is None:
-        noise = tf.random_normal([n_samples, 128])
+        noise = tf.random_normal([n_samples, 256])
 
-    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*8*dim, noise)
+    output = lib.ops.linear.Linear('Generator.Input', 256, 4*4*8*dim, noise)
     output = tf.reshape(output, [-1, 8*dim, 4, 4])
     if bn:
         output = Batchnorm('Generator.BN1', [0,2,3], output)
@@ -193,11 +196,12 @@ def DCGANGenerator(n_samples, noise=None, dim=DIM, bn=True, nonlinearity=tf.nn.r
 
     return tf.reshape(output, [-1, OUTPUT_DIM])
 
-def WGANPaper_CrippledDCGANGenerator(n_samples, noise=None, dim=DIM):
+def WGANPaper_CrippledDCGANGenerator(
+        n_samples, noise=None, dim=DIM, input_dim=INPUT_DIM):
     if noise is None:
-        noise = tf.random_normal([n_samples, 128])
+        noise = tf.random_normal([n_samples, input_dim])
 
-    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*dim, noise)
+    output = lib.ops.linear.Linear('Generator.Input', input_dim, 4*4*dim, noise)
     output = tf.nn.relu(output)
     output = tf.reshape(output, [-1, dim, 4, 4])
 
@@ -215,11 +219,11 @@ def WGANPaper_CrippledDCGANGenerator(n_samples, noise=None, dim=DIM):
 
     return tf.reshape(output, [-1, OUTPUT_DIM])
 
-def ResnetGenerator(n_samples, noise=None, dim=DIM):
+def ResnetGenerator(n_samples, noise=None, dim=DIM, input_dim=INPUT_DIM):
     if noise is None:
-        noise = tf.random_normal([n_samples, 128])
+        noise = tf.random_normal([n_samples, input_dim])
 
-    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*8*dim, noise)
+    output = lib.ops.linear.Linear('Generator.Input', input_dim, 4*4*8*dim, noise)
     output = tf.reshape(output, [-1, 8*dim, 4, 4])
 
     for i in range(6):
@@ -243,11 +247,11 @@ def ResnetGenerator(n_samples, noise=None, dim=DIM):
     return tf.reshape(output, [-1, OUTPUT_DIM])
 
 
-def MultiplicativeDCGANGenerator(n_samples, noise=None, dim=DIM, bn=True):
+def MultiplicativeDCGANGenerator(n_samples, noise=None, dim=DIM, bn=True, input_dim=INPUT_DIM):
     if noise is None:
-        noise = tf.random_normal([n_samples, 128])
+        noise = tf.random_normal([n_samples, input_dim])
 
-    output = lib.ops.linear.Linear('Generator.Input', 128, 4*4*8*dim*2, noise)
+    output = lib.ops.linear.Linear('Generator.Input', input_dim, 4*4*8*dim*2, noise)
     output = tf.reshape(output, [-1, 8*dim*2, 4, 4])
     if bn:
         output = Batchnorm('Generator.BN1', [0,2,3], output)
@@ -384,8 +388,13 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
         with tf.device(device):
 
             real_data = tf.reshape(2*((tf.cast(real_data_conv, tf.float32)/255.)-.5), [BATCH_SIZE//len(DEVICES), OUTPUT_DIM])
+            # 
+            real_data_reshape = tf.image.transpose(real_data, [0, 2, 3, 1])
+            
+            real_data_downsampled = tf.image.resize_area(
+                real_data_reshape, [DIM//K, DIM//K])
             fake_data = Generator(BATCH_SIZE//len(DEVICES))
-
+            
             disc_real = Discriminator(real_data)
             disc_fake = Discriminator(fake_data)
 
