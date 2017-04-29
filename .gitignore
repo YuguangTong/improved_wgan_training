@@ -2,6 +2,7 @@
 push
 
 data/
+summary/
 *.pyc
 *.pkl
 *.jpg

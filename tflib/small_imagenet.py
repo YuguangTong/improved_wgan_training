@@ -17,7 +17,7 @@ def make_generator(path, n_files, batch_size):
                 yield (images,)
     return get_epoch
 
-def load(batch_size, data_dir='/home/ishaan/data/imagenet64'):
+def load(batch_size, data_dir='/home/Tong/improved_wgan_training/data/imagenet'):
     return (
         make_generator(data_dir+'/train_64x64', 1281149, batch_size),
         make_generator(data_dir+'/valid_64x64', 49999, batch_size)
@@ -28,6 +28,7 @@ if __name__ == '__main__':
     t0 = time.time()
     for i, batch in enumerate(train_gen(), start=1):
         print("{}\t{}".format(str(time.time() - t0), batch[0][0,0,0,0]))
-        if i == 1000:
+        if i == 5:
+            print(type(batch), batch[0].shape, batch[0].dtype)
             break
         t0 = time.time()

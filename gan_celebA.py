@@ -14,6 +14,7 @@ import tflib.ops.conv2d
 import tflib.ops.batchnorm
 import tflib.ops.deconv2d
 import tflib.save_images
+import tflib.celebA_64x64
 import tflib.small_imagenet
 import tflib.ops.layernorm
 import tflib.plot
@@ -21,6 +22,7 @@ import tflib.plot
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
 DATA_DIR = 'data/celebA_64x64'
+#DATA_DIR = 'data/imagenet'
 SUMMARY_DIR = 'summary/celebA'
 if len(DATA_DIR) == 0:
     raise Exception('Please specify path to data directory in gan_64x64.py!')
@@ -30,12 +32,11 @@ DIM = 64 # Model dimensionality
 CRITIC_ITERS = 5 # How many iterations to train the critic for
 N_GPUS = 1 # Number of GPUs
 BATCH_SIZE = 16 # Batch size. Must be a multiple of N_GPUS
-ITERS = 20000 # How many iterations to train for
+ITERS = 5000 # How many iterations to train for
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
 OUTPUT_DIM = 64*64*3 # Number of pixels in each iamge
 
 lib.print_model_settings(locals().copy())
-
 def GeneratorAndDiscriminator():
     """
     Choose which generator and discriminator architecture to use by
@@ -434,8 +435,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
     gen_cost = tf.add_n(gen_costs) / len(DEVICES)
     disc_cost = tf.add_n(disc_costs) / len(DEVICES)
-    tf.summary.scalar('gen loss', gen_cost)
-    tf.summary.scalar('disc loss', disc_cost)
+    tf.summary.scalar('gen loss', gen_cost, collections=['scalars'])
+    tf.summary.scalar('disc loss', disc_cost, collections=['scalars'])
 
     if MODE == 'wgan':
         gen_train_op = tf.train.RMSPropOptimizer(learning_rate=5e-5).minimize(gen_cost,
@@ -484,7 +485,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
         # add image to summary
         image_op = tf.summary.image(
             'generator output', all_fixed_noise_samples)
-        image_summary = sess.run(image_op)
+        image_summary = session.run(image_op)
         summary_writer.add_summary(image_summary, iteration)
 
         samples = session.run(all_fixed_noise_samples)
@@ -494,6 +495,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
     # Dataset iterator
     train_gen = lib.celebA_64x64.load(BATCH_SIZE, data_dir=DATA_DIR)
+    #train_gen, dev_gen = lib.small_imagenet.load(BATCH_SIZE, data_dir=DATA_DIR)
 
     def inf_train_gen():
         while True:
@@ -508,7 +510,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
 
     # Train loop
-    merged = tf.summary.merge_all()
+    merged_scalars = tf.summary.merge_all(key='scalars')
     summary_writer = tf.summary.FileWriter(SUMMARY_DIR, session.graph)
 
     session.run(tf.global_variables_initializer())
@@ -534,20 +536,21 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
         lib.plot.plot('train disc cost', _disc_cost)
         lib.plot.plot('time', time.time() - start_time)
+        #print('iter={0} disc_loss={1:.3g} time={2:.2g}'.format(
+        #    iteration, _disc_cost, time.time() - start_time))
 
         if iteration % 10 == 0:
-            merged_summary = sess.run(merged)
+            merged_summary = session.run(merged_scalars, feed_dict={all_real_data_conv: _data})
             summary_writer.add_summary(merged_summary, iteration)
 
-#         if iteration % 200 == 199:
-#             t = time.time()
+         if iteration % 200 == 199:
+             t = time.time()
 #             dev_disc_costs = []
 #             for (images,) in dev_gen():
 #                 _dev_disc_cost = session.run(disc_cost, feed_dict={all_real_data_conv: _data}) 
 #                 dev_disc_costs.append(_dev_disc_cost)
 #             lib.plot.plot('dev disc cost', np.mean(dev_disc_costs))
-
-#             generate_image(iteration)
+             generate_image(iteration)
 
         if (iteration < 5) or (iteration % 200 == 199):
             lib.plot.flush()
