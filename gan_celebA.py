@@ -390,12 +390,12 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             disc_fake = Discriminator(fake_data)
 
             if MODE == 'wgan':
-                gen_cost = -tf.reduce_mean(disc_fake)
-                disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
+                gen_cost = tf.reduce_mean(disc_fake)
+                disc_cost = tf.reduce_mean(disc_real) - tf.reduce_mean(disc_fake)
 
             elif MODE == 'wgan-gp':
-                gen_cost = -tf.reduce_mean(disc_fake)
-                disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
+                gen_cost = tf.reduce_mean(disc_fake)
+                disc_cost = tf.reduce_mean(disc_real) - tf.reduce_mean(disc_fake)
 
                 alpha = tf.random_uniform(
                     shape=[BATCH_SIZE//len(DEVICES),1], 

@@ -27,30 +27,47 @@ tf.app.flags.DEFINE_string('mode', 'wgan-gp',
 tf.app.flags.DEFINE_string('data_dir', 'data/celebA_64x64', "data directory")
 tf.app.flags.DEFINE_string('train_dir', 'train', "image output direcotory")
 tf.app.flags.DEFINE_string('summary_dir', 'summary', "tensorboard summary directory")
-tf.app.flags.DEFINE_string('max_runtime', 20, "maximum run time in min")
-#tf.
+tf.app.flags.DEFINE_integer('max_runtime', 20, "maximum run time in min")
+tf.app.flags.DEFINE_integer('max_iter', 500, "maximum mini-batch iterations")
+tf.app.flags.DEFINE_float('LAMBDA', 10., "gradient penalty lambda parameter")
+tf.app.flags.DEFINE_float('gen_l1_weight', 0.9, "weight of L1 difference in generator loss")
+
 
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
-DATA_DIR = 'data/celebA_64x64'
-SUMMARY_DIR = 'summary/celebA'
+DATA_DIR = FLAGS.data_dir
+SUMMARY_DIR = FLAGS.summary_dir
+GEN_L1_WEIGHT = FLAGS.gen_l1_weight # Weighting factor for L1 difference in generator loss
+TRAIN_DIR = FLAGS.train_dir # Directory to output image
+MODE = FLAGS.mode # dcgan, wgan, wgan-gp, lsgan
+ITERS = FLAGS.max_iter # How many iterations to train for
+LAMBDA = FLAGS.LAMBDA # Gradient penalty lambda hyperparameter
+
 if len(DATA_DIR) == 0:
     raise Exception('Please specify path to data directory in gan_64x64.py!')
 
-MODE = 'wgan-gp' # dcgan, wgan, wgan-gp, lsgan
 DIM = 64 # Model dimensionality
 K = 4 # How much to downsample
 CRITIC_ITERS = 5 # How many iterations to train the critic for
 N_GPUS = 1 # Number of GPUs
 BATCH_SIZE = 16 # Batch size. Must be a multiple of N_GPUS
-ITERS = 5000 # How many iterations to train for
-LAMBDA = 10 # Gradient penalty lambda hyperparameter
 INPUT_DIM = 16*16*3 # Number of pixels in each input
 OUTPUT_DIM = 64*64*3 # Number of pixels in each iamge
-GEN_L1_WEIGHT = 0.9 # Weighting factor for L1 difference in generator loss
-TRAIN_DIR = '.' # Directory to output image
+DELETE_TRAIN_DIR=True
 
 lib.print_model_settings(locals().copy())
+
+# create summary dir
+if not tf.gfile.Exists(FLAGS.summary_dir):
+    tf.gfile.MakeDirs(FLAGS.summary_dir)
+
+# clean directory
+if DELETE_TRAIN_DIR:
+    if tf.gfile.Exists(FLAGS.train_dir):
+        tf.gfile.DeleteRecursively(FLAGS.train_dir)
+        tf.gfile.MakeDirs(FLAGS.train_dir)
+    tf.gfile.MakeDirs(FLAGS.train_dir)
+
 def GeneratorAndDiscriminator():
     """
     Choose which generator and discriminator architecture to use by
@@ -438,12 +455,12 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             disc_fake = Discriminator(fake_data)
 
             if MODE == 'wgan':
-                gen_cost = -tf.reduce_mean(disc_fake)
-                disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
+                gen_cost = tf.reduce_mean(disc_fake)
+                disc_cost = tf.reduce_mean(disc_real) - tf.reduce_mean(disc_fake)
 
             elif MODE == 'wgan-gp':
-                gen_cost = -tf.reduce_mean(disc_fake)
-                disc_cost = tf.reduce_mean(disc_fake) - tf.reduce_mean(disc_real)
+                gen_cost = tf.reduce_mean(disc_fake)
+                disc_cost = tf.reduce_mean(disc_real) - tf.reduce_mean(disc_fake)
 
                 alpha = tf.random_uniform(
                     shape=[BATCH_SIZE//len(DEVICES),1], 
@@ -493,6 +510,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
     gen_cost = tf.add_n(gen_costs) / len(DEVICES)
     disc_cost = tf.add_n(disc_costs) / len(DEVICES)
+    gen_gan_cost = tf.add_n(gen_gan_costs) / len(DEVICES)
+    gen_l1_cost = tf.add_n(gen_l1_costs) / len(DEVICES)
     tf.summary.scalar('gen gan loss', gen_gan_cost, collections=['scalars'])
     tf.summary.scalar('gen l1 diff', gen_l1_cost, collections=['scalars'])
     tf.summary.scalar('gen loss', gen_cost, collections=['scalars'])
@@ -570,28 +589,29 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
         fake_data = tf.transpose(fake_data, [0, 2, 3, 1])
         real_data = tf.reshape(real_data, [-1, 3, DIM, DIM])
         real_data = tf.transpose(real_data, [0, 2, 3, 1])
+        real_data = (real_data + 1.) / 2.
         clipped = tf.maximum(tf.minimum(fake_data, 1.), 0.)
         image = tf.concat([nearest, bicubic, clipped, real_data], 2)
 
         feed_dict = {real_data_conv: test_data}
         image_col = tf.summary.image('generator output', image, max_samples)
-        image_summary = session.run(image_op, feed_dict=feed_dict)
+        image_summary = session.run(image_col, feed_dict=feed_dict)
         summary_writer.add_summary(image_summary, iteration)
 
         image = image[0:max_samples,:,:,:]
         image = tf.concat([image[i,:,:,:] for i in range(max_samples)], 0)
         clipped = clipped[0:max_samples, :, :, :]
-        clipped = tf.concat([clipped[i, :, :, :] for in range(max_samples)], 1]
+        clipped = tf.concat([clipped[i, :, :, :] for i in range(max_samples)], 1)
 
         image, clipped = session.run([image, clipped], feed_dict=feed_dict)
         
         filename_1 = 'batch%06d_image.png' % iteration
         filename_2 = 'batch%06d_row.png' % iteration
         filename_1 = os.path.join(TRAIN_DIR, filename_1)
-        filename_2 = os.path.join(TRAIN_DRI, filename_2)
+        filename_2 = os.path.join(TRAIN_DIR, filename_2)
         scipy.misc.toimage(image, cmin=0., cmax=1.).save(filename_1)
         scipy.misc.toimage(clipped, cmin=0., cmax=1.).save(filename_2)
-        print("Saved %s" % (filename_1, filename_2))
+        print("Saved %s %s" % (filename_1, filename_2))
 
         
 
@@ -659,3 +679,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             lib.plot.flush()
 
         lib.plot.tick()
+
+
+if __name__ == '__main__':
+    tf.app.run()

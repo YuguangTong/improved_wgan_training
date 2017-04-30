@@ -20,9 +20,9 @@ def make_generator(data_dir, n_files, batch_size):
                 yield (images,)
     return get_epoch
 
-image_indices = [73883, 36510, 132301, 57264, 152931, 93861,
+image_indices = [73883, 110251, 132301, 57264, 152931, 93861,
                  124938, 79512, 106152, 127384, 134028, 67874,
-                 10613, 110251, 198694, 100990]
+                 10613, 36510, 198694, 100990]
 
 def make_testset(data_dir, image_indices=image_indices):
     images = np.zeros((len(image_indices), 3, 64, 64), dtype=np.int32)
@@ -39,7 +39,7 @@ def load(batch_size, data_dir='/home/Tong/improved_wgan_training/data/celebA_64x
         raise Exception("{} is not a directory".format(data_dir))
     file_count = 202599
     print('load {} files'.format(file_count))
-    return make_generator(data_dir, file_count, batch_size), make_test(data_dir)
+    return make_generator(data_dir, file_count, batch_size), make_testset(data_dir)
 
 if __name__ == '__main__':
     train_gen, test_images  = load(64)
