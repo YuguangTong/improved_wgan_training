@@ -19,6 +19,17 @@ import tflib.small_imagenet
 import tflib.ops.layernorm
 import tflib.plot
 
+FLAGS = tf.app.flags.FLAGS
+
+# Configurations
+tf.app.flags.DEFINE_string('mode', 'wgan-gp',
+                           "loss function option. [wgan-gp | dcgan | wgan | lsgan]")
+tf.app.flags.DEFINE_string('data_dir', 'data/celebA_64x64', "data directory")
+tf.app.flags.DEFINE_string('train_dir', 'train', "image output direcotory")
+tf.app.flags.DEFINE_string('summary_dir', 'summary', "tensorboard summary directory")
+tf.app.flags.DEFINE_string('max_runtime', 20, "maximum run time in min")
+#tf.
+
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
 DATA_DIR = 'data/celebA_64x64'
