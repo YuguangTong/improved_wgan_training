@@ -411,6 +411,8 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
         split_real_data_conv = tf.split(all_real_data_conv, len(DEVICES))
     else:
         split_real_data_conv = tf.split(0, len(DEVICES), all_real_data_conv)
+
+    gen_l1_costs, gen_gan_costs = [], []
     gen_costs, disc_costs = [],[]
 
     for device_index, (device, real_data_conv) in enumerate(zip(DEVICES, split_real_data_conv)):
@@ -469,13 +471,19 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             fake_data_downsampled = downsample(fake_data)
             gen_l1_cost = tf.reduce_mean(
                 tf.abs(fake_data_downsampled - real_data_downsampled))
+
+            gen_l1_costs.append(gen_l1_cost)
+            gen_gan_costs.append(gen_cost)
+
             gen_cost = GEN_L1_WEIGHT * gen_l1_cost + (1 - GEN_L1_WEIGHT) * gen_cost
-            
+
             gen_costs.append(gen_cost)
             disc_costs.append(disc_cost)
 
     gen_cost = tf.add_n(gen_costs) / len(DEVICES)
     disc_cost = tf.add_n(disc_costs) / len(DEVICES)
+    tf.summary.scalar('gen gan loss', gen_gan_cost, collections=['scalars'])
+    tf.summary.scalar('gen l1 diff', gen_l1_cost, collections=['scalars'])
     tf.summary.scalar('gen loss', gen_cost, collections=['scalars'])
     tf.summary.scalar('disc loss', disc_cost, collections=['scalars'])
 
@@ -539,41 +547,47 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 #         lib.save_images.save_images(samples.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_{}.png'.format(iteration))
 
     
-    def generate_test_image(iteration, real_data, fake_data,  max_samples=8):
+    def generate_test_image(iteration, real_data, fake_data,  max_samples=10):
         feature = tf.reshape(real_data_downsampled, [-1, 3, DIM//K, DIM//K])
         # BCHW -> BHWC
-        feature = tf.transpose(feature, [0, 2, 3, 1])
+        feature = (tf.transpose(feature, [0, 2, 3, 1]) + 1)/2.
         nearest = tf.image.resize_nearest_neighbor(feature, [DIM, DIM])
-        nearest = tf.maximum(tf.minimum(nearest, 0.5), -0.5)
+        nearest = tf.maximum(tf.minimum(nearest, 1.), 0.)
         bicubic = tf.image.resize_bicubic(feature, [DIM, DIM])
-        bicubic = tf.maximum(tf.minimum(bicubic, 0.5), -0.5)
-        fake_data = tf.reshape(fake_data, [-1, 3, DIM, DIM])
+        bicubic = tf.maximum(tf.minimum(bicubic, 1.), 0.)
+        fake_data = (tf.reshape(fake_data, [-1, 3, DIM, DIM]) + 1.)/2.
         fake_data = tf.transpose(fake_data, [0, 2, 3, 1])
         real_data = tf.reshape(real_data, [-1, 3, DIM, DIM])
         real_data = tf.transpose(real_data, [0, 2, 3, 1])
-        clipped = tf.maximum(tf.minimum(fake_data, 0.5), -0.5)
+        clipped = tf.maximum(tf.minimum(fake_data, 1.), 0.)
         image = tf.concat([nearest, bicubic, clipped, real_data], 2)
 
-        feed_dict = {real_data_conv: _x}
-        image_op = tf.summary.image('generator output', image, max_samples)
+        feed_dict = {real_data_conv: test_data}
+        image_col = tf.summary.image('generator output', image, max_samples)
         image_summary = session.run(image_op, feed_dict=feed_dict)
         summary_writer.add_summary(image_summary, iteration)
 
         image = image[0:max_samples,:,:,:]
         image = tf.concat([image[i,:,:,:] for i in range(max_samples)], 0)
-        image = session.run(image, feed_dict=feed_dict)
+        clipped = clipped[0:max_samples, :, :, :]
+        clipped = tf.concat([clipped[i, :, :, :] for in range(max_samples)], 1]
 
-        filename = 'batch%06d.png' % iteration
-        filename = os.path.join(TRAIN_DIR, filename)
-        scipy.misc.toimage(image, cmin=-0.5, cmax=.5).save(filename)
-        print("Saved %s" % (filename,))
+        image, clipped = session.run([image, clipped], feed_dict=feed_dict)
+        
+        filename_1 = 'batch%06d_image.png' % iteration
+        filename_2 = 'batch%06d_row.png' % iteration
+        filename_1 = os.path.join(TRAIN_DIR, filename_1)
+        filename_2 = os.path.join(TRAIN_DRI, filename_2)
+        scipy.misc.toimage(image, cmin=0., cmax=1.).save(filename_1)
+        scipy.misc.toimage(clipped, cmin=0., cmax=1.).save(filename_2)
+        print("Saved %s" % (filename_1, filename_2))
 
         
 
 
 
-    # Dataset iterator
-    train_gen = lib.celebA_64x64.load(BATCH_SIZE, data_dir=DATA_DIR)
+    # Dataset iterator and test set (for visualization) 
+    train_gen, test_data = lib.celebA_64x64.load(BATCH_SIZE, data_dir=DATA_DIR)
     #train_gen, dev_gen = lib.small_imagenet.load(BATCH_SIZE, data_dir=DATA_DIR)
 
     def inf_train_gen():
@@ -586,7 +600,6 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     _x_r = session.run(real_data, feed_dict={real_data_conv: _x})
     _x_r = ((_x_r+1.)*(255.99/2)).astype('int32')
     lib.save_images.save_images(_x_r.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_groundtruth.png')
-
 
     # Train loop
     merged_scalars = tf.summary.merge_all(key='scalars')
