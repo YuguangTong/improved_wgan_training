@@ -6,7 +6,7 @@ import functools
 
 import numpy as np
 import tensorflow as tf
-import sklearn.datasets
+import scipy.misc
 
 import tflib as lib
 import tflib.ops.linear
@@ -539,21 +539,24 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 #         lib.save_images.save_images(samples.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_{}.png'.format(iteration))
 
     
-    def generate_test_image(iteration, max_samples=8):
+    def generate_test_image(iteration, real_data, fake_data,  max_samples=8):
         feature = tf.reshape(real_data_downsampled, [-1, 3, DIM//K, DIM//K])
         # BCHW -> BHWC
         feature = tf.transpose(feature, [0, 2, 3, 1])
         nearest = tf.image.resize_nearest_neighbor(feature, [DIM, DIM])
-        nearest = tf.maximum(tf.minimum(nearest, 1.0), 0.0)
+        nearest = tf.maximum(tf.minimum(nearest, 0.5), -0.5)
         bicubic = tf.image.resize_bicubic(feature, [DIM, DIM])
-        bicubic = tf.maximum(tf.minimum(bicubic, 1.0), 0.0)
+        bicubic = tf.maximum(tf.minimum(bicubic, 0.5), -0.5)
+        fake_data = tf.reshape(fake_data, [-1, 3, DIM, DIM])
+        fake_data = tf.transpose(fake_data, [0, 2, 3, 1])
+        real_data = tf.reshape(real_data, [-1, 3, DIM, DIM])
+        real_data = tf.transpose(real_data, [0, 2, 3, 1])
+        clipped = tf.maximum(tf.minimum(fake_data, 0.5), -0.5)
+        image = tf.concat([nearest, bicubic, clipped, real_data], 2)
 
-        clipped = tf.maximum(tf.minimum(fake_data, 1.0), 0.0)
-        image = tf.concat([nearest, bicubic, clipped, label], 2)
-
-        feed_dict = {_real_data_conv: _x}
+        feed_dict = {real_data_conv: _x}
         image_op = tf.summary.image('generator output', image, max_samples)
-        image_summary = session.run(image_op, feed_dict=feed_ditct)
+        image_summary = session.run(image_op, feed_dict=feed_dict)
         summary_writer.add_summary(image_summary, iteration)
 
         image = image[0:max_samples,:,:,:]
@@ -562,7 +565,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
         filename = 'batch%06d.png' % iteration
         filename = os.path.join(TRAIN_DIR, filename)
-        scipy.misc.toimage(image, cmin=0., cmax=1.).save(filename)
+        scipy.misc.toimage(image, cmin=-0.5, cmax=.5).save(filename)
         print("Saved %s" % (filename,))
 
         
@@ -619,14 +622,14 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
             merged_summary = session.run(merged_scalars, feed_dict={all_real_data_conv: _data})
             summary_writer.add_summary(merged_summary, iteration)
 
-        if iteration % 200 == 19:
+        if iteration % 200 == 9:
             t = time.time()
             #dev_disc_costs = []
             #for (images,) in dev_gen():
             #    _dev_disc_cost = session.run(disc_cost, feed_dict={all_real_data_conv: _data}) 
             #    dev_disc_costs.append(_dev_disc_cost)
             #lib.plot.plot('dev disc cost', np.mean(dev_disc_costs))
-            generate_image(iteration)
+            generate_test_image(iteration, real_data, fake_data)
 
         if (iteration < 5) or (iteration % 200 == 199):
             lib.plot.flush()
