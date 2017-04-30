@@ -37,6 +37,7 @@ LAMBDA = 10 # Gradient penalty lambda hyperparameter
 INPUT_DIM = 16*16*3 # Number of pixels in each input
 OUTPUT_DIM = 64*64*3 # Number of pixels in each iamge
 GEN_L1_WEIGHT = 0.9 # Weighting factor for L1 difference in generator loss
+TRAIN_DIR = '.' # Directory to output image
 
 lib.print_model_settings(locals().copy())
 def GeneratorAndDiscriminator():
@@ -512,29 +513,60 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     else:
         raise Exception()
 
-    # For generating samples
-    fixed_noise = tf.constant(np.random.normal(size=(BATCH_SIZE, INPUT_DIM)).astype('float32'))
-    all_fixed_noise_samples = []
-    for device_index, device in enumerate(DEVICES):
-        n_samples = BATCH_SIZE // len(DEVICES)
-        all_fixed_noise_samples.append(Generator(n_samples, noise=fixed_noise[device_index*n_samples:(device_index+1)*n_samples]))
-    if tf.__version__.startswith('1.'):
-        all_fixed_noise_samples = tf.concat(all_fixed_noise_samples, axis=0)
-    else:
-        all_fixed_noise_samples = tf.concat(0, all_fixed_noise_samples)
-    def generate_image(iteration):
-        # add image to summary
-        samples_reshaped = tf.reshape(
-            all_fixed_noise_samples, (BATCH_SIZE, 3, DIM, DIM))
-        samples_reshaped = tf.transpose(samples_reshaped, [0, 2, 3, 1])
-        image_op = tf.summary.image(
-            'generator output', samples_reshaped)
-        image_summary = session.run(image_op)
+#     # For generating samples
+#     fixed_noise = tf.constant(np.random.normal(size=(BATCH_SIZE, INPUT_DIM)).astype('float32'))
+#     all_fixed_noise_samples = []
+#     for device_index, device in enumerate(DEVICES):
+#         n_samples = BATCH_SIZE // len(DEVICES)
+#         all_fixed_noise_samples.append(Generator(n_samples, noise=fixed_noise[device_index*n_samples:(device_index+1)*n_samples]))
+#     if tf.__version__.startswith('1.'):
+#         all_fixed_noise_samples = tf.concat(all_fixed_noise_samples, axis=0)
+#     else:
+#         all_fixed_noise_samples = tf.concat(0, all_fixed_noise_samples)
+
+#     def generate_image(iteration):
+#         # add image to summary
+#         samples_reshaped = tf.reshape(
+#             all_fixed_noise_samples, (BATCH_SIZE, 3, DIM, DIM))
+#         samples_reshaped = tf.transpose(samples_reshaped, [0, 2, 3, 1])
+#         image_op = tf.summary.image(
+#             'generator output', samples_reshaped)
+#         image_summary = session.run(image_op)
+#         summary_writer.add_summary(image_summary, iteration)
+
+#         samples = session.run(all_fixed_noise_samples)
+#         samples = ((samples+1.)*(255.99/2)).astype('int32')
+#         lib.save_images.save_images(samples.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_{}.png'.format(iteration))
+
+    
+    def generate_test_image(iteration, max_samples=8):
+        feature = tf.reshape(real_data_downsampled, [-1, 3, DIM//K, DIM//K])
+        # BCHW -> BHWC
+        feature = tf.transpose(feature, [0, 2, 3, 1])
+        nearest = tf.image.resize_nearest_neighbor(feature, [DIM, DIM])
+        nearest = tf.maximum(tf.minimum(nearest, 1.0), 0.0)
+        bicubic = tf.image.resize_bicubic(feature, [DIM, DIM])
+        bicubic = tf.maximum(tf.minimum(bicubic, 1.0), 0.0)
+
+        clipped = tf.maximum(tf.minimum(fake_data, 1.0), 0.0)
+        image = tf.concat([nearest, bicubic, clipped, label], 2)
+
+        feed_dict = {_real_data_conv: _x}
+        image_op = tf.summary.image('generator output', image, max_samples)
+        image_summary = session.run(image_op, feed_dict=feed_ditct)
         summary_writer.add_summary(image_summary, iteration)
 
-        samples = session.run(all_fixed_noise_samples)
-        samples = ((samples+1.)*(255.99/2)).astype('int32')
-        lib.save_images.save_images(samples.reshape((BATCH_SIZE, 3, 64, 64)), 'samples_{}.png'.format(iteration))
+        image = image[0:max_samples,:,:,:]
+        image = tf.concat([image[i,:,:,:] for i in range(max_samples)], 0)
+        image = session.run(image, feed_dict=feed_dict)
+
+        filename = 'batch%06d.png' % iteration
+        filename = os.path.join(TRAIN_DIR, filename)
+        scipy.misc.toimage(image, cmin=0., cmax=1.).save(filename)
+        print("Saved %s" % (filename,))
+
+        
+
 
 
     # Dataset iterator
