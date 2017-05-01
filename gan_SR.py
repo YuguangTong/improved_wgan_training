@@ -420,14 +420,25 @@ def DCGANDiscriminator(inputs, dim=DIM, bn=True, nonlinearity=LeakyReLU):
 
     return tf.reshape(output, [-1])
 
-def downsample(data, dim=DIM, k=K):
-    data = tf.reshape(data, [-1, 3, dim, dim])
+# kernel for downsampling
+arr = np.zeros([K, K, 3, 3])
+arr[:,:,0,0] = 1.0/(K*K)
+arr[:,:,1,1] = 1.0/(K*K)
+arr[:,:,2,2] = 1.0/(K*K)
+_downsample_weight = tf.constant(arr, dtype=tf.float32)
+
+def downsample(data, method='conv'):
+    data = tf.reshape(data, [-1, 3, DIM, DIM])
     # BCHW -> BHWC
     data = tf.transpose(data, [0, 2, 3, 1])
-    data = tf.image.resize_images(data, [dim//k, dim//k])
+    if method == 'conv':
+        data = tf.nn.conv2d(data, _downsample_weight,
+                            strides=[1, K, K, 1], padding='SAME')
+    elif method == 'area':
+        data = tf.image.resize_area(data, [DIM//K, DIM//K])
     # BHWC -> BCHW
     data = tf.transpose(data, [0, 3, 1, 2])
-    data = tf.reshape(data, [-1, 3 * dim//k * dim//k])
+    data = tf.reshape(data, [-1, 3 * DIM//K * DIM//K])
     return data
 
 Generator, Discriminator = GeneratorAndDiscriminator()
