@@ -3,13 +3,23 @@ import scipy.misc
 import time
 import os
 
+image_indices = [73883, 110251, 132301, 57264, 152931, 93861,
+                 124938, 79512, 106152, 127384, 134028, 67874,
+                 10613, 36510, 198694, 100990]
+
 def make_generator(data_dir, n_files, batch_size):
     epoch_count = [1]
+
     def get_epoch():
         images = np.zeros((batch_size, 3, 64, 64), dtype='int32')
         files = [name for name in os.listdir(data_dir)
                  if os.path.isfile(os.path.join(data_dir, name))]
-        assert n_files == len(files)
+        # remove testset
+        for i in image_indices:
+            test_file = "{}.jpg".format(str(i).zfill(6))
+            files.remove(test_file)
+        assert n_files == len(files) + len(image_indices)
+        
         random_state = np.random.RandomState(epoch_count[0])
         random_state.shuffle(files)
         epoch_count[0] += 1
@@ -20,9 +30,6 @@ def make_generator(data_dir, n_files, batch_size):
                 yield (images,)
     return get_epoch
 
-image_indices = [73883, 110251, 132301, 57264, 152931, 93861,
-                 124938, 79512, 106152, 127384, 134028, 67874,
-                 10613, 36510, 198694, 100990]
 
 def make_testset(data_dir, image_indices=image_indices):
     images = np.zeros((len(image_indices), 3, 64, 64), dtype=np.int32)

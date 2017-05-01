@@ -31,7 +31,7 @@ tf.app.flags.DEFINE_integer('max_runtime', 20, "maximum run time in min")
 tf.app.flags.DEFINE_integer('max_iter', 500, "maximum mini-batch iterations")
 tf.app.flags.DEFINE_float('LAMBDA', 10., "gradient penalty lambda parameter")
 tf.app.flags.DEFINE_float('gen_l1_weight', 0.9, "weight of L1 difference in generator loss")
-
+tf.app.flags.DEFINE_integer('architecture', 0, "index of architecture")
 
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
@@ -68,33 +68,42 @@ if DELETE_TRAIN_DIR:
         tf.gfile.MakeDirs(FLAGS.train_dir)
     tf.gfile.MakeDirs(FLAGS.train_dir)
 
+# architecture dictionary
+def get_architectures():
+    ARCHITECTURE_TABLE = {
+        # Baseline (G: DCGAN, D: DCGAN)
+        0: (DCGANGenerator, DCGANDiscriminator),
+
+        # No BN and constant number of filts in G
+        1: (WGANPaper_CrippledDCGANGenerator, DCGANDiscriminator),
+
+        # 512-dim 4-layer ReLU MLP G
+        2: (FCGenerator, DCGANDiscriminator),
+
+        # No normalization anywhere
+        3: (functools.partial(DCGANGenerator, bn=False),
+            functools.partial(DCGANDiscriminator, bn=False)),
+
+        # Gated multiplicative nonlinearities everywhere
+        4: (MultiplicativeDCGANGenerator, MultiplicativeDCGANDiscriminator),
+
+        # tanh nonlinearities everywhere
+        5: (functools.partial(DCGANGenerator, bn=True, nonlinearity=tf.tanh),
+            functools.partial(DCGANDiscriminator, bn=True, nonlinearity=tf.tanh)),
+
+        # 101-layer ResNet G and D
+        6: (ResnetGenerator, ResnetDiscriminator)
+    }
+    return ARCHITECTURE_TABLE
+
 def GeneratorAndDiscriminator():
     """
     Choose which generator and discriminator architecture to use by
     uncommenting one of these lines.
     """
-
-    # Baseline (G: DCGAN, D: DCGAN)
-    return DCGANGenerator, DCGANDiscriminator
-
-    # No BN and constant number of filts in G
-    # return WGANPaper_CrippledDCGANGenerator, DCGANDiscriminator
-
-    # 512-dim 4-layer ReLU MLP G
-    # return FCGenerator, DCGANDiscriminator
-
-    # No normalization anywhere
-    # return functools.partial(DCGANGenerator, bn=False), functools.partial(DCGANDiscriminator, bn=False)
-
-    # Gated multiplicative nonlinearities everywhere
-    # return MultiplicativeDCGANGenerator, MultiplicativeDCGANDiscriminator
-
-    # tanh nonlinearities everywhere
-    # return functools.partial(DCGANGenerator, bn=True, nonlinearity=tf.tanh), \
-    #        functools.partial(DCGANDiscriminator, bn=True, nonlinearity=tf.tanh)
-
-    # 101-layer ResNet G and D
-    # return ResnetGenerator, ResnetDiscriminator
+    table = get_architectures()
+    if FLAGS.architecture <= len(table):
+        return table[FLAGS.architecture]
 
     raise Exception('You must choose an architecture!')
 
@@ -649,9 +658,13 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
     session.run(tf.global_variables_initializer())
     gen = inf_train_gen()
+    all_start_time = time.time()
     for iteration in range(ITERS):
-
         start_time = time.time()
+        # finish if run overtime
+        total_elapsed = (start_time - all_start_time) / 60.
+        if total_elapsed > FLAGS.max_runtime:
+            break
 
         # Train generator
         if iteration > 0:
