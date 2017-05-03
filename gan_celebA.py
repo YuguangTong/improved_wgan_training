@@ -22,8 +22,7 @@ import tflib.plot
 # Download 64x64 ImageNet at http://image-net.org/small/download.php and
 # fill in the path to the extracted files here!
 DATA_DIR = 'data/celebA_64x64'
-#DATA_DIR = 'data/imagenet'
-SUMMARY_DIR = 'summary/celebA'
+SUMMARY_DIR = 'summary/celebA/1'
 if len(DATA_DIR) == 0:
     raise Exception('Please specify path to data directory in gan_64x64.py!')
 
@@ -497,7 +496,7 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
 
 
     # Dataset iterator
-    train_gen = lib.celebA_64x64.load(BATCH_SIZE, data_dir=DATA_DIR)
+    train_gen, _ = lib.celebA_64x64.load(BATCH_SIZE, data_dir=DATA_DIR)
     #train_gen, dev_gen = lib.small_imagenet.load(BATCH_SIZE, data_dir=DATA_DIR)
 
     def inf_train_gen():

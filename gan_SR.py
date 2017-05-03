@@ -145,19 +145,19 @@ def ResidualBlock(name, input_dim, output_dim, filter_size, inputs, resample=Non
     """
     if resample=='down':
         conv_shortcut = functools.partial(lib.ops.conv2d.Conv2D, stride=2)
-        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim/2)
-        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2, output_dim=output_dim/2, stride=2)
-        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim/2, output_dim=output_dim)
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim//2)
+        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim//2, output_dim=output_dim//2, stride=2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim//2, output_dim=output_dim)
     elif resample=='up':
         conv_shortcut = SubpixelConv2D
-        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim/2)
-        conv_1b       = functools.partial(lib.ops.deconv2d.Deconv2D, input_dim=input_dim/2, output_dim=output_dim/2)
-        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim/2, output_dim=output_dim)
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim, output_dim=input_dim//2)
+        conv_1b       = functools.partial(lib.ops.deconv2d.Deconv2D, input_dim=input_dim//2, output_dim=output_dim//2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=output_dim//2, output_dim=output_dim)
     elif resample==None:
         conv_shortcut = lib.ops.conv2d.Conv2D
-        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim,  output_dim=input_dim/2)
-        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2,  output_dim=output_dim/2)
-        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim/2, output_dim=output_dim)
+        conv_1        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim,  output_dim=input_dim//2)
+        conv_1b       = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim//2,  output_dim=output_dim/2)
+        conv_2        = functools.partial(lib.ops.conv2d.Conv2D, input_dim=input_dim//2, output_dim=output_dim)
 
     else:
         raise Exception('invalid resample value')
@@ -293,11 +293,11 @@ def ResnetGenerator(n_samples, noise=None, dim=DIM, input_dim=INPUT_DIM):
     output = ResidualBlock('Generator.Up3', 2*dim, 1*dim, 3, output, resample='up')
     for i in range(6):
         output = ResidualBlock('Generator.32x32_{}'.format(i), 1*dim, 1*dim, 3, output, resample=None)
-    output = ResidualBlock('Generator.Up4', 1*dim, dim/2, 3, output, resample='up')
+    output = ResidualBlock('Generator.Up4', 1*dim, dim//2, 3, output, resample='up')
     for i in range(5):
         output = ResidualBlock('Generator.64x64_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
 
-    output = lib.ops.conv2d.Conv2D('Generator.Out', dim/2, 3, 1, output, he_init=False)
+    output = lib.ops.conv2d.Conv2D('Generator.Out', dim//2, 3, 1, output, he_init=False)
     output = tf.tanh(output / 5.)
 
     return tf.reshape(output, [-1, OUTPUT_DIM])
@@ -364,11 +364,11 @@ def MultiplicativeDCGANDiscriminator(inputs, dim=DIM, bn=True):
 
 def ResnetDiscriminator(inputs, dim=DIM):
     output = tf.reshape(inputs, [-1, 3, 64, 64])
-    output = lib.ops.conv2d.Conv2D('Discriminator.In', 3, dim/2, 1, output, he_init=False)
+    output = lib.ops.conv2d.Conv2D('Discriminator.In', 3, dim//2, 1, output, he_init=False)
 
     for i in range(5):
         output = ResidualBlock('Discriminator.64x64_{}'.format(i), dim/2, dim/2, 3, output, resample=None)
-    output = ResidualBlock('Discriminator.Down1', dim/2, dim*1, 3, output, resample='down')
+    output = ResidualBlock('Discriminator.Down1', dim//2, dim*1, 3, output, resample='down')
     for i in range(6):
         output = ResidualBlock('Discriminator.32x32_{}'.format(i), dim*1, dim*1, 3, output, resample=None)
     output = ResidualBlock('Discriminator.Down2', dim*1, dim*2, 3, output, resample='down')
@@ -538,9 +538,9 @@ with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as session:
     tf.summary.scalar('disc loss', disc_cost, collections=['scalars'])
 
     if MODE == 'wgan':
-        gen_train_op = tf.train.RMSPropOptimizer(learning_rate=5e-5).minimize(
+        gen_train_op = tf.train.RMSPropOptimizer(learning_rate=1e-4).minimize(
             gen_cost, var_list=lib.params_with_name('Generator'), colocate_gradients_with_ops=True)
-        disc_train_op = tf.train.RMSPropOptimizer(learning_rate=5e-5).minimize(disc_cost,
+        disc_train_op = tf.train.RMSPropOptimizer(learning_rate=1e-4).minimize(disc_cost,
                                              var_list=lib.params_with_name('Discriminator.'), colocate_gradients_with_ops=True)
 
         clip_ops = []
