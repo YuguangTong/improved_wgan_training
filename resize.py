@@ -12,7 +12,7 @@ image_size = 64
 # K = 4
 # image_size_k = image_size // K
 
-input_dir = 'dataset'
+input_dir = 'img_align_celeba'
 output_dir = 'celebA_64x64'
 
 
