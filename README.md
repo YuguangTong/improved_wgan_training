@@ -3,19 +3,20 @@ Improved Training of Wasserstein GANs
 This is a project test Wasserstein GAN objectives on single image super-resolution. The code is built on a fork of [the popular project under the same title](https://github.com/igul222/improved_wgan_training). 
 
 We expand the original repo by another model
-`gan_SR.py`: GANs that generate 64x64-pixel images in 16x16 low resolution inputs. The default dataset is the cropped aligned celebA dataset. Other dataset would require minor modifications.
+`gan_SR.py`: GANs that generate 64x64-pixel images from 16x16-low-resolution inputs. The default dataset is the cropped aligned celebA dataset. Other dataset would require minor modifications.
 
 Data preprocessing is required before training:
 > `bash celebA_preprocess.sh`
+
 will download celebA dataset, crop and resize to 64x64. Note this might take a while. 
 
 To run, modify the path of data directory, summary directory (for tensorboard) and output directory in `run_script.sh`. 
 
 > `bash run_script.sh`
 
-Here is a sample output, using WGAN-GP objective and DCGAN architecture and training for 1 epoch. 
+Here is a sample output, using WGAN-GP objective and DCGAN architecture and 1 epoch of training.  From left to right are low resolution input, bicubic interpolation, wgangp output and original image. 
 
-![](wgangp_dcgan_panel.png)
+![input | bicubic | WGAN-gp | original](wgangp_dcgan_panel.png)
 
 
 Description of the original repository
